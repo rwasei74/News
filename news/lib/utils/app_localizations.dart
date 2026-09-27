@@ -42,6 +42,12 @@ class AppLocalizations {
       'health': 'Health',
       'entertainment': 'Entertainment',
       'supervised_by': 'Supervised by Mohamed Nabil',
+      'all_sources': 'All Sources',
+      'no_news': 'No news available right now.',
+      'retry': 'Try Again',
+      'open_error': 'Could not open this article.',
+      'search_hint': 'Search news',
+      'search_prompt': 'Type what you want to search for, then press search.',
     },
     'ar': {
       'app_title': 'تطبيق الأخبار',
@@ -65,6 +71,12 @@ class AppLocalizations {
       'health': 'صحة',
       'entertainment': 'ترفيه',
       'supervised_by': 'إشراف محمد نبيل',
+      'all_sources': 'كل المصادر',
+      'no_news': 'لا توجد أخبار متاحة الآن.',
+      'retry': 'إعادة المحاولة',
+      'open_error': 'تعذر فتح هذا الخبر.',
+      'search_hint': 'ابحث عن الأخبار',
+      'search_prompt': 'اكتب ما تريد البحث عنه، ثم اضغط بحث.',
     },
   };
 

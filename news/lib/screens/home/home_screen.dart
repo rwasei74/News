@@ -4,6 +4,8 @@ import '../../utils/app_localizations.dart';
 import '../../utils/app_text_styles.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/category_card_item.dart';
+import '../category/category_news_screen.dart';
+import '../search/news_search_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -16,42 +18,49 @@ class HomeScreen extends StatelessWidget {
     final categories = [
       {
         'title': localizations.general,
+        'category': 'general',
         'lightImage': AppAssets.categoryGeneralClean,
         'darkImage': AppAssets.categoryGeneralDark,
         'alignment': CategoryCardAlignment.imageLeft,
       },
       {
         'title': localizations.business,
+        'category': 'business',
         'lightImage': AppAssets.categoryBusinessClean,
         'darkImage': AppAssets.categoryBusinessDark,
         'alignment': CategoryCardAlignment.imageRight,
       },
       {
         'title': localizations.sports,
+        'category': 'sports',
         'lightImage': AppAssets.categorySportsClean,
         'darkImage': AppAssets.categorySportsDark,
         'alignment': CategoryCardAlignment.imageLeft,
       },
       {
         'title': localizations.technology,
+        'category': 'technology',
         'lightImage': AppAssets.categoryTechnologyClean,
         'darkImage': AppAssets.categoryTechnologyDark,
         'alignment': CategoryCardAlignment.imageRight,
       },
       {
         'title': localizations.science,
+        'category': 'science',
         'lightImage': AppAssets.categoryScienceClean,
         'darkImage': AppAssets.categoryScienceDark,
         'alignment': CategoryCardAlignment.imageLeft,
       },
       {
         'title': localizations.health,
+        'category': 'health',
         'lightImage': AppAssets.categoryHealthClean,
         'darkImage': AppAssets.categoryHealthDark,
         'alignment': CategoryCardAlignment.imageRight,
       },
       {
         'title': localizations.entertainment,
+        'category': 'entertainment',
         'lightImage': AppAssets.categoryEntertainmentClean,
         'darkImage': AppAssets.categoryEntertainmentDark,
         'alignment': CategoryCardAlignment.imageLeft,
@@ -75,7 +84,9 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              // Search feature trigger
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NewsSearchScreen()),
+              );
             },
           ),
         ],
@@ -108,10 +119,12 @@ class HomeScreen extends StatelessWidget {
                     darkImagePath: category['darkImage'] as String,
                     alignment: category['alignment'] as CategoryCardAlignment,
                     onViewAllPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${category['title']} - ${localizations.viewAll}'),
-                          duration: const Duration(seconds: 1),
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => CategoryNewsScreen(
+                            category: category['category'] as String,
+                            title: category['title'] as String,
+                          ),
                         ),
                       );
                     },

@@ -44,7 +44,7 @@ class AppDrawer extends StatelessWidget {
                 // Go To Home
                 InkWell(
                   onTap: () {
-                    Navigator.pop(context);
+                    Navigator.of(context).popUntil((route) => route.isFirst);
                   },
                   borderRadius: BorderRadius.circular(10),
                   child: Padding(

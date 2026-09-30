@@ -1,25 +1,34 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../blocs/news_search/news_search_bloc.dart';
 import '../../models/news_article.dart';
-import '../../services/news_api_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_localizations.dart';
 
-class NewsSearchScreen extends StatefulWidget {
+class NewsSearchScreen extends StatelessWidget {
   const NewsSearchScreen({super.key});
 
   @override
-  State<NewsSearchScreen> createState() => _NewsSearchScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => NewsSearchBloc(),
+      child: const _NewsSearchView(),
+    );
+  }
 }
 
-class _NewsSearchScreenState extends State<NewsSearchScreen> {
+class _NewsSearchView extends StatefulWidget {
+  const _NewsSearchView();
+
+  @override
+  State<_NewsSearchView> createState() => _NewsSearchViewState();
+}
+
+class _NewsSearchViewState extends State<_NewsSearchView> {
   final _controller = TextEditingController();
-  final _service = NewsApiService();
-  List<NewsArticle> _articles = [];
-  String? _errorMessage;
-  var _isLoading = false;
 
   @override
   void dispose() {
@@ -27,22 +36,8 @@ class _NewsSearchScreenState extends State<NewsSearchScreen> {
     super.dispose();
   }
 
-  Future<void> _search(String value) async {
-    final query = value.trim();
-    if (query.isEmpty) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    try {
-      final articles = await _service.searchNews(query);
-      if (mounted) setState(() => _articles = articles);
-    } on NewsApiException catch (error) {
-      if (mounted) setState(() => _errorMessage = error.message);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _search(String value) {
+    context.read<NewsSearchBloc>().add(SearchNews(value));
   }
 
   Future<void> _openArticle(NewsArticle article) async {
@@ -84,34 +79,48 @@ class _NewsSearchScreenState extends State<NewsSearchScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Text(_errorMessage!, textAlign: TextAlign.center),
-                  ),
-                )
-              : _articles.isEmpty
-                  ? Center(
-                      child: Text(
-                        localizations.translate('search_prompt'),
-                        style: TextStyle(color: secondaryColor),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _articles.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final article = _articles[index];
-                        return _SearchResultTile(
-                          article: article,
-                          onTap: () => _openArticle(article),
-                        );
-                      },
-                    ),
+      body: BlocBuilder<NewsSearchBloc, NewsSearchState>(
+        builder: (context, state) {
+          if (state is NewsSearchLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is NewsSearchError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(state.message, textAlign: TextAlign.center),
+              ),
+            );
+          } else if (state is NewsSearchLoaded) {
+            if (state.articles.isEmpty) {
+              return Center(
+                child: Text(
+                  localizations.translate('search_prompt'),
+                  style: TextStyle(color: secondaryColor),
+                ),
+              );
+            }
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: state.articles.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final article = state.articles[index];
+                return _SearchResultTile(
+                  article: article,
+                  onTap: () => _openArticle(article),
+                );
+              },
+            );
+          }
+          // Initial state
+          return Center(
+            child: Text(
+              localizations.translate('search_prompt'),
+              style: TextStyle(color: secondaryColor),
+            ),
+          );
+        },
+      ),
     );
   }
 }

@@ -48,7 +48,7 @@
 
 ---
 
-## What you can do
+## Features
 
 | | Capability | Details |
 | :---: | --- | --- |
@@ -80,6 +80,8 @@ The app uses **top headlines** for category feeds, **available sources** for the
 
 | Area | Choice |
 | --- | --- |
+| Architecture | **MVVM** (Model-View-ViewModel) utilizing **BLoC** |
+| State Management | [flutter_bloc](https://pub.dev/packages/flutter_bloc) & [equatable](https://pub.dev/packages/equatable) |
 | Framework | [Flutter](https://flutter.dev/) · Dart SDK `^3.12.0` |
 | News data | [NewsAPI](https://newsapi.org/) |
 | Network client | [Dio](https://pub.dev/packages/dio) |
@@ -93,6 +95,7 @@ The app uses **top headlines** for category feeds, **available sources** for the
 
 ```text
 lib/
+├── blocs/           # Business Logic Components (ViewModels)
 ├── models/          # NewsArticle and NewsSource
 ├── screens/
 │   ├── splash/      # Animated introduction

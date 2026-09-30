@@ -1,16 +1,16 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../blocs/category_news/category_news_bloc.dart';
 import '../../models/news_article.dart';
-import '../../models/news_source.dart';
-import '../../services/news_api_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_localizations.dart';
 import '../../widgets/app_drawer.dart';
 import '../search/news_search_screen.dart';
 
-class CategoryNewsScreen extends StatefulWidget {
+class CategoryNewsScreen extends StatelessWidget {
   const CategoryNewsScreen({
     super.key,
     required this.category,
@@ -21,101 +21,46 @@ class CategoryNewsScreen extends StatefulWidget {
   final String title;
 
   @override
-  State<CategoryNewsScreen> createState() => _CategoryNewsScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => CategoryNewsBloc()..add(LoadCategoryNews(category: category)),
+      child: _CategoryNewsView(title: title, category: category),
+    );
+  }
 }
 
-class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
-  final _service = NewsApiService();
+class _CategoryNewsView extends StatefulWidget {
+  const _CategoryNewsView({required this.title, required this.category});
+
+  final String title;
+  final String category;
+
+  @override
+  State<_CategoryNewsView> createState() => _CategoryNewsViewState();
+}
+
+class _CategoryNewsViewState extends State<_CategoryNewsView> {
   final _scrollController = ScrollController();
-  final List<NewsArticle> _articles = [];
-  List<NewsSource> _sources = [];
-  String? _selectedSourceId;
-  String? _errorMessage;
-  var _isLoading = true;
-  var _isLoadingMore = false;
-  var _hasMore = true;
-  var _page = 1;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_loadMoreWhenNeeded);
-    _loadInitial();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _scrollController
-      ..removeListener(_loadMoreWhenNeeded)
-      ..dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadInitial() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _page = 1;
-      _hasMore = true;
-    });
-
-    try {
-      final results = await Future.wait([
-        _service.getTopHeadlines(
-          category: widget.category,
-          sourceId: _selectedSourceId,
-        ),
-        _service.getSources(widget.category),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _articles
-          ..clear()
-          ..addAll(results[0] as List<NewsArticle>);
-        _sources = results[1] as List<NewsSource>;
-        _hasMore = _articles.length == 20;
-      });
-    } on NewsApiException catch (error) {
-      if (mounted) _errorMessage = error.message;
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll - currentScroll <= 280) {
+      context.read<CategoryNewsBloc>().add(LoadMoreCategoryNews());
     }
-  }
-
-  Future<void> _loadMoreWhenNeeded() async {
-    if (!_scrollController.hasClients ||
-        _isLoading ||
-        _isLoadingMore ||
-        !_hasMore ||
-        _scrollController.position.extentAfter > 280) {
-      return;
-    }
-
-    setState(() => _isLoadingMore = true);
-    try {
-      final nextPage = _page + 1;
-      final nextArticles = await _service.getTopHeadlines(
-        category: widget.category,
-        sourceId: _selectedSourceId,
-        page: nextPage,
-      );
-      if (!mounted) return;
-      setState(() {
-        _page = nextPage;
-        _articles.addAll(nextArticles);
-        _hasMore = nextArticles.length == 20;
-      });
-    } on NewsApiException {
-      // The existing results remain usable if loading another page fails.
-    } finally {
-      if (mounted) setState(() => _isLoadingMore = false);
-    }
-  }
-
-  Future<void> _selectSource(String? sourceId) async {
-    if (sourceId == _selectedSourceId) return;
-    setState(() => _selectedSourceId = sourceId);
-    await _loadInitial();
   }
 
   Future<void> _openArticle(NewsArticle article) async {
@@ -134,8 +79,7 @@ class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final localizations = AppLocalizations.of(context);
     final textColor = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final secondaryColor =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final secondaryColor = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Scaffold(
       appBar: AppBar(
@@ -160,74 +104,86 @@ class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
         ],
       ),
       drawer: const AppDrawer(),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? _NewsError(message: _errorMessage!, onRetry: _loadInitial)
-              : RefreshIndicator(
-                  onRefresh: _loadInitial,
-                  child: CustomScrollView(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: SizedBox(
-                          height: 52,
-                          child: ListView(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            scrollDirection: Axis.horizontal,
-                            children: [
-                              _SourceChip(
-                                label: localizations.translate('all_sources'),
-                                selected: _selectedSourceId == null,
-                                onTap: () => _selectSource(null),
-                              ),
-                              ..._sources.map(
-                                (source) => _SourceChip(
-                                  label: source.name,
-                                  selected: _selectedSourceId == source.id,
-                                  onTap: () => _selectSource(source.id),
-                                ),
-                              ),
-                            ],
+      body: BlocBuilder<CategoryNewsBloc, CategoryNewsState>(
+        builder: (context, state) {
+          if (state is CategoryNewsInitial || state is CategoryNewsLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is CategoryNewsError) {
+            return _NewsError(
+              message: state.message,
+              onRetry: () => context.read<CategoryNewsBloc>().add(LoadCategoryNews(category: widget.category)),
+            );
+          } else if (state is CategoryNewsLoaded) {
+            return RefreshIndicator(
+              onRefresh: () async {
+                context.read<CategoryNewsBloc>().add(LoadCategoryNews(category: widget.category, sourceId: state.selectedSourceId));
+              },
+              child: CustomScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 52,
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          _SourceChip(
+                            label: localizations.translate('all_sources'),
+                            selected: state.selectedSourceId == null,
+                            onTap: () => context.read<CategoryNewsBloc>().add(const ChangeCategorySource(null)),
                           ),
-                        ),
-                      ),
-                      if (_articles.isEmpty)
-                        SliverFillRemaining(
-                          child: Center(
-                            child: Text(
-                              localizations.translate('no_news'),
-                              style: TextStyle(color: secondaryColor),
+                          ...state.sources.map(
+                            (source) => _SourceChip(
+                              label: source.name,
+                              selected: state.selectedSourceId == source.id,
+                              onTap: () => context.read<CategoryNewsBloc>().add(ChangeCategorySource(source.id)),
                             ),
                           ),
-                        )
-                      else
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          sliver: SliverList.separated(
-                            itemCount: _articles.length + (_isLoadingMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == _articles.length) {
-                                return const Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: Center(child: CircularProgressIndicator()),
-                                );
-                              }
-                              return _NewsArticleCard(
-                                article: _articles[index],
-                                textColor: textColor,
-                                secondaryColor: secondaryColor,
-                                isArabic: Localizations.localeOf(context).languageCode == 'ar',
-                                onTap: () => _openArticle(_articles[index]),
-                              );
-                            },
-                            separatorBuilder: (_, _) => const SizedBox(height: 12),
-                          ),
-                        ),
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  if (state.articles.isEmpty)
+                    SliverFillRemaining(
+                      child: Center(
+                        child: Text(
+                          localizations.translate('no_news'),
+                          style: TextStyle(color: secondaryColor),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      sliver: SliverList.separated(
+                        itemCount: state.articles.length + (state.isLoadingMore ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == state.articles.length) {
+                            return const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Center(child: CircularProgressIndicator()),
+                            );
+                          }
+                          return _NewsArticleCard(
+                            article: state.articles[index],
+                            textColor: textColor,
+                            secondaryColor: secondaryColor,
+                            isArabic: Localizations.localeOf(context).languageCode == 'ar',
+                            onTap: () => _openArticle(state.articles[index]),
+                          );
+                        },
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        },
+      ),
     );
   }
 }
@@ -364,7 +320,7 @@ class _NewsError extends StatelessWidget {
   const _NewsError({required this.message, required this.onRetry});
 
   final String message;
-  final Future<void> Function() onRetry;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
